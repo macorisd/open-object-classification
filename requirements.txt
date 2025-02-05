@@ -1,0 +1,7 @@
+segment-anything
+torch
+torchvision
+transformers
+opencv-python
+numpy
+pillow

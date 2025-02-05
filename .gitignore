@@ -1,0 +1,21 @@
+Para ignorar archivos innecesarios en Git.
+
+# Python-specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+.env/
+
+# Logs and Output Files
+*.log
+*.out
+output_segments/
+classifications.txt
+
+# Model Checkpoints
+*.pth
+*.pt
