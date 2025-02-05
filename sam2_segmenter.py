@@ -11,7 +11,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sam = sam_model_registry[MODEL_TYPE](checkpoint=SAM_CHECKPOINT).to(device)
 predictor = SamPredictor(sam)
 
-INPUT_IMAGE_PATH = "input_image.jpg"
+INPUT_IMAGE_PATH = "input_image2.jpg"
 image = cv2.imread(INPUT_IMAGE_PATH)
 if image is None:
     raise FileNotFoundError(f"No se pudo cargar la imagen en {INPUT_IMAGE_PATH}")

@@ -4,7 +4,7 @@ import torch
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 from PIL import Image
 
-MODEL_NAME = "llava-hf/llava-1.5-7b"
+MODEL_NAME = "llava-hf/llava-1.5-7b-hf"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 processor = AutoProcessor.from_pretrained(MODEL_NAME)
 model = LlavaForConditionalGeneration.from_pretrained(MODEL_NAME).to(device)
