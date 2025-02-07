@@ -12,7 +12,7 @@ DESC_DIR = os.path.join(script_dir, "output_descriptions")
 
 os.makedirs(DESC_DIR, exist_ok=True)
 
-timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
+timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
 txt_filename = f"descriptions_{timestamp}.txt"
 txt_path = os.path.join(DESC_DIR, txt_filename)
 
