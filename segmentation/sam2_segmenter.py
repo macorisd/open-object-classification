@@ -5,7 +5,12 @@ import torch
 import numpy as np
 from segment_anything import SamAutomaticMaskGenerator, sam_model_registry
 
-SAM_CHECKPOINT = "sam_vit_h_4b8939.pth"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+INPUT_IMAGE_PATH = os.path.join(script_dir, "input_images", "input_image.jpg")
+OUTPUT_DIR = os.path.join(script_dir, "output_segments")
+
+SAM_CHECKPOINT = os.path.join(script_dir, "sam_vit_h_4b8939.pth")
 MODEL_TYPE = "vit_h"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -23,7 +28,6 @@ mask_generator = SamAutomaticMaskGenerator(
 )
 
 # Carga de la imagen
-INPUT_IMAGE_PATH = "input_image.jpg"
 image = cv2.imread(INPUT_IMAGE_PATH)
 if image is None:
     raise FileNotFoundError(f"No se pudo cargar la imagen en {INPUT_IMAGE_PATH}")
@@ -33,8 +37,6 @@ image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 # Genera las máscaras automáticamente
 masks = mask_generator.generate(image_rgb)
 
-# Crear/limpiar carpeta de salida
-OUTPUT_DIR = "output_segments"
 # Si la carpeta existe, la borramos para que empiece limpia
 if os.path.exists(OUTPUT_DIR):
     shutil.rmtree(OUTPUT_DIR)

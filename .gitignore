@@ -14,7 +14,6 @@ venv/
 *.log
 *.out
 output_segments/
-classifications.txt
 
 # Model Checkpoints
 *.pth
