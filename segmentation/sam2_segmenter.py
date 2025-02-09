@@ -1,5 +1,3 @@
-"""Refactor the code into an OOP approach, creating a class that encapsulates the main logic."""
-
 import os
 import shutil
 import cv2
@@ -16,8 +14,7 @@ class SamSegmenter:
     def __init__(
         self,
         script_dir: str,
-        input_image_name: str = "input_image.jpg",
-        output_dir_name: str = "output_segments",
+        input_image_name: str = "input_image.jpg",        
         sam_checkpoint_name: str = "sam_vit_h_4b8939.pth",
         model_type: str = "vit_h",
         pred_iou_thresh: float = 0.99, # TODO: adjust parameters
@@ -27,7 +24,7 @@ class SamSegmenter:
         # Initialize paths
         self.script_dir = script_dir
         self.input_image_path = os.path.join(script_dir, "input_images", input_image_name)
-        self.output_dir = os.path.join(script_dir, output_dir_name)
+        self.output_dir = os.path.join(script_dir, "output_segments")
         self.sam_checkpoint = os.path.join(script_dir, sam_checkpoint_name)
         self.model_type = model_type
 
