@@ -17,9 +17,10 @@ class SamSegmenter:
         input_image_name: str = "input_image.jpg",        
         sam_checkpoint_name: str = "sam_vit_h_4b8939.pth",
         model_type: str = "vit_h",
-        pred_iou_thresh: float = 0.7, # TODO: adjust parameters
-        stability_score_thresh: float = 0.7, # TODO: adjust parameters
-        box_nms_thresh: float = 0.3 # TODO: adjust parameters
+        pred_iou_thresh: float = 0.8,
+        stability_score_thresh: float = 0.8,
+        box_nms_thresh: float = 0.3,
+        MAX_MASKS: int = 10
     ):
         # Initialize paths
         self.script_dir = script_dir
@@ -27,6 +28,7 @@ class SamSegmenter:
         self.output_dir = os.path.join(script_dir, "output_segments")
         self.sam_checkpoint = os.path.join(script_dir, sam_checkpoint_name)
         self.model_type = model_type
+        self.MAX_MASKS = MAX_MASKS
 
         # Initialize device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,6 +61,7 @@ class SamSegmenter:
         
         self.image = None
         self.masks = []
+        self.prev_params = None
 
     def load_image(self) -> None:
         """
@@ -69,6 +72,37 @@ class SamSegmenter:
             raise FileNotFoundError(f"Failed to load image at {self.input_image_path}")
         self.image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
+    def adjust_mask_generator_params(self, backtrack: bool = False) -> None:
+        """
+        Adjusts the SAM mask generator parameters to reduce the number of generated masks.
+
+        Args:
+            backtrack (bool): Whether to backtrack the adjustments.
+        """
+        # Attempt to reduce the number of masks by adjusting the parameters
+        if not backtrack:
+            # Save the current parameters for backtracking
+            self.prev_params = {
+                "pred_iou_thresh": self.mask_generator.pred_iou_thresh,
+                "stability_score_thresh": self.mask_generator.stability_score_thresh,
+                "box_nms_thresh": self.mask_generator.box_nms_thresh
+            }
+            
+            # Adjust the parameters
+            self.mask_generator.pred_iou_thresh = min(0.99, self.mask_generator.pred_iou_thresh + 0.02)
+            self.mask_generator.stability_score_thresh = min(0.99, self.mask_generator.stability_score_thresh + 0.02)
+            self.mask_generator.box_nms_thresh = max(0.001, self.mask_generator.box_nms_thresh - 0.2)
+        else:
+            # Backtrack the adjustments            
+            if self.prev_params is not None:
+                self.mask_generator.pred_iou_thresh = self.prev_params["pred_iou_thresh"]
+                self.mask_generator.stability_score_thresh = self.prev_params["stability_score_thresh"]
+                self.mask_generator.box_nms_thresh = self.prev_params["box_nms_thresh"]
+
+                self.prev_params = None
+            else:
+                print("No previous parameters for backtracking.\n")
+
     def generate_masks(self) -> None:
         """
         Generates masks using the SamAutomaticMaskGenerator.
@@ -76,24 +110,32 @@ class SamSegmenter:
         if self.image is None:
             raise ValueError("Image not loaded. Call load_image() before generate_masks().")
         
+        # Generate masks
         self.masks = self.mask_generator.generate(self.image)
-        print(f"Number of masks: {len(self.masks)}")
-            
-        # if (len(self.masks) > 10):
-        #     print("More than 10 masks generated. Sorting by stability score and keeping the top 10.")
-        #     self.masks = sorted(self.masks, key=lambda mask: mask["stability_score"], reverse=True)[:10]
+        print(f"Number of masks: {len(self.masks)}")                    
         
-        if (len(self.masks) > 7):
+        # Adjust the mask generator parameters to reduce the number of masks if necessary
+        if (len(self.masks) > self.MAX_MASKS):
+            print(f"More than {self.MAX_MASKS} masks generated. Reducing masks...")
             while True:
-                self.mask_generator.pred_iou_thresh = min(0.99, self.mask_generator.pred_iou_thresh + 0.02)
-                self.mask_generator.stability_score_thresh = min(0.99, self.mask_generator.stability_score_thresh + 0.02)
-                self.mask_generator.box_nms_thresh = max(0.001, self.mask_generator.box_nms_thresh - 0.2)
-
-                self.masks = self.mask_generator.generate(self.image)
-                print(f"Number of masks reduced to {len(self.masks)}")                
+                self.adjust_mask_generator_params()
+                self.masks = self.mask_generator.generate(self.image)                          
                 
-                if (len(self.masks) <= 7):
+                # If the number of masks is reduced to the MAX_MASKS or less, break the loop
+                if (len(self.masks) <= self.MAX_MASKS):
+                    # If no masks are generated, backtrack the adjustments
+                    if not self.masks:
+                        self.adjust_mask_generator_params(backtrack=True)
+                        self.masks = self.mask_generator.generate(self.image)
+                        print(f"Number of masks: {len(self.masks)}. Tried to reduce the number of masks to {self.MAX_MASKS} or less, but no masks were generated.\n")
+                    
+                    else:
+                        print(f"Number of masks reduced to {len(self.masks)}.\n")
+                    
                     break
+
+                else:
+                    print(f"Number of masks reduced to {len(self.masks)}. Reducing to {self.MAX_MASKS} (or less) masks...")
 
     def save_segmentation_results(self) -> None:
         """
@@ -120,7 +162,7 @@ class SamSegmenter:
 
         # Print info and save each mask
         for i, mask_data in enumerate(self.masks):
-            print(f"--- Segment {i} ---")
+            print(f"--- Segment {i+1} ---")
             print(f"Area: {mask_data.get('area')}")
             print(f"BBox: {mask_data.get('bbox')}")
             print(f"Predicted IoU: {mask_data.get('predicted_iou')}")
@@ -139,11 +181,11 @@ class SamSegmenter:
             cropped_segment = segment[y:y+h, x:x+w]
 
             # Save the cropped segment
-            output_path = os.path.join(self.output_dir, f"automatic_segment_{i}.png")
+            output_path = os.path.join(self.output_dir, f"automatic_segment_{i+1}.png")
             cv2.imwrite(output_path, cropped_segment)
             print(f"Saved: {output_path}\n")
 
-        print("Automatic segmentation completed.")
+        print(f"Automatic segmentation completed. {len(self.masks)} segments saved to {self.output_dir}")
 
 
 def main():
@@ -153,9 +195,10 @@ def main():
     segmenter = SamSegmenter(
         script_dir=script_dir,
         input_image_name="input_image2.jpg",
-        pred_iou_thresh=0.8, # TODO: adjust parameters
-        stability_score_thresh=0.8, # TODO: adjust parameters
-        box_nms_thresh=0.3 # TODO: adjust parameters
+        pred_iou_thresh=0.8,
+        stability_score_thresh=0.8,
+        box_nms_thresh=0.3,
+        MAX_MASKS=10
     )
 
     # Workflow
