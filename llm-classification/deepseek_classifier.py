@@ -138,7 +138,7 @@ class DeepseekClassifier:
                 break
             else:
                 print("\nThe answer is not in the correct format. Trying again...\n")
-        else:            
+        else:
             raise TimeoutError(f"Timeout of {self.timeout} seconds reached without receiving a correct answer format.")
 
         if self.save_file:
