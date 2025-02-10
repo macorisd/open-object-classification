@@ -114,8 +114,12 @@ class SamSegmenter:
             image_bgr = cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR)
             segment = cv2.bitwise_and(image_bgr, image_bgr, mask=segmentation * 255)
 
+            x, y, w, h = [int(coord) for coord in mask_data["bbox"]]
+
+            cropped_segment = segment[y:y+h, x:x+w]
+
             output_path = os.path.join(self.output_dir, f"automatic_segment_{i}.png")
-            cv2.imwrite(output_path, segment)
+            cv2.imwrite(output_path, cropped_segment)
             print(f"Saved: {output_path}\n")
 
         print("Automatic segmentation completed.")
@@ -127,9 +131,10 @@ def main():
     # Create the segmenter instance
     segmenter = SamSegmenter(
         script_dir=script_dir,
+        input_image_name="input_image2.jpg",
         pred_iou_thresh=0.99, # TODO: adjust parameters
         stability_score_thresh=0.97, # TODO: adjust parameters
-        box_nms_thresh=0.3 # TODO: adjust parameters
+        box_nms_thresh=0.01 # TODO: adjust parameters
     )
 
     # Workflow
