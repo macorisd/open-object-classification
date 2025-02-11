@@ -15,7 +15,7 @@ class DeepseekClassifier:
         script_dir: str,  # Path to the script directory
         deepseek_model_name: str = "deepseek-r1:14b",
         save_file: bool = True,  # Whether to save the classification results to a file
-        timeout: int = 60  # Timeout in seconds
+        timeout: int = 120  # Timeout in seconds
     ):
         """
         Initializes the paths, sets the timeout, and creates the classification directory.
@@ -156,7 +156,7 @@ class DeepseekClassifier:
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    classifier = DeepseekClassifier(script_dir, save_file=False, timeout=120)
+    classifier = DeepseekClassifier(script_dir, save_file=False)
     final_answer = classifier.classify()
     print("\nFinal correct answer substring:\n", final_answer)
 

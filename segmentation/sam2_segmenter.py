@@ -3,12 +3,33 @@ import shutil
 import cv2
 import torch
 import numpy as np
+import time
 from segment_anything import SamAutomaticMaskGenerator, sam_model_registry
 
 
 class SamSegmenter:
     """
     A class to handle image loading, segmentation with SAM (Segment Anything), and saving mask results.
+
+    Attributes:
+        script_dir (str): Path to the directory containing the script.
+        input_image_name (str): Name of the input image file.
+        sam_checkpoint_name (str): Name of the SAM model checkpoint file.
+        model_type (str): Type of the SAM model.
+        pred_iou_thresh (float): IoU threshold for filtering masks.
+        stability_score_thresh (float): Stability score threshold for mask quality.
+        box_nms_thresh (float): NMS threshold for filtering overlapping boxes.
+        reduce_masks (bool): Whether to reduce the number of generated masks.
+        MAX_MASKS (int): Maximum number of masks to keep.
+        segment_min_area (int): Minimum mask area to keep.
+        segment_max_area_ratio (float): Maximum mask area ratio to keep.
+        timeout (int): Timeout in seconds for mask generation.
+        device (torch.device): Device to use for the SAM model.
+        sam (torch.nn.Module): SAM model instance.
+        mask_generator (SamAutomaticMaskGenerator): SAM automatic mask generator instance.
+        image (np.ndarray): Input image as a NumPy array.
+        masks (list[dict]): List of dictionaries containing segmentation mask data.
+        prev_params (dict): Previous SAM mask generator parameters for backtracking.
     """
 
     def __init__(
@@ -20,15 +41,26 @@ class SamSegmenter:
         pred_iou_thresh: float = 0.8,
         stability_score_thresh: float = 0.8,
         box_nms_thresh: float = 0.3,
-        MAX_MASKS: int = 10
+        reduce_masks: bool = True,
+        MAX_MASKS: int = 10,
+        segment_min_area: int = 10000,
+        segment_max_area_ratio: float = 0.4,
+        timeout: int = 120
     ):
+        """
+        Initializes the SamSegmenter instance.        
+        """
         # Initialize paths
         self.script_dir = script_dir
         self.input_image_path = os.path.join(script_dir, "input_images", input_image_name)
         self.output_dir = os.path.join(script_dir, "output_segments")
         self.sam_checkpoint = os.path.join(script_dir, sam_checkpoint_name)
         self.model_type = model_type
+        self.reduce_masks = reduce_masks
         self.MAX_MASKS = MAX_MASKS
+        self.segment_min_area = segment_min_area
+        self.segment_max_area_ratio = segment_max_area_ratio
+        self.timeout = timeout
 
         # Initialize device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -57,7 +89,7 @@ class SamSegmenter:
             pred_iou_thresh=pred_iou_thresh,
             stability_score_thresh=stability_score_thresh,
             box_nms_thresh=box_nms_thresh
-        )        
+        )
         
         self.image = None
         self.masks = []
@@ -71,6 +103,31 @@ class SamSegmenter:
         if image_bgr is None:
             raise FileNotFoundError(f"Failed to load image at {self.input_image_path}")
         self.image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+
+    def segment_filtering(self) -> None:
+        """
+        Filters out masks based on certain properties.
+        """
+        self.min_area_filtering()
+        self.max_area_filtering()
+
+    def min_area_filtering(self) -> None:
+        """
+        Filters out masks with an area less than the minimum area threshold.
+        """
+        self.masks = [mask for mask in self.masks if mask["area"] >= self.segment_min_area]
+
+    def max_area_filtering(self) -> None:
+        """
+        Filters out masks whose area is greater than the input image area multiplied by area_ratio.
+        """
+        if self.image is None:
+            raise ValueError("Image not loaded. Call load_image() before max_area_filtering().")
+
+        image_area = self.image.shape[0] * self.image.shape[1]
+        threshold = self.segment_max_area_ratio * image_area
+
+        self.masks = [mask for mask in self.masks if mask["area"] <= threshold]
 
     def adjust_mask_generator_params(self, backtrack: bool = False) -> None:
         """
@@ -91,7 +148,7 @@ class SamSegmenter:
             # Adjust the parameters
             self.mask_generator.pred_iou_thresh = min(0.99, self.mask_generator.pred_iou_thresh + 0.02)
             self.mask_generator.stability_score_thresh = min(0.99, self.mask_generator.stability_score_thresh + 0.02)
-            self.mask_generator.box_nms_thresh = max(0.001, self.mask_generator.box_nms_thresh - 0.2)
+            self.mask_generator.box_nms_thresh = max(0.001, self.mask_generator.box_nms_thresh - 0.06)
         else:
             # Backtrack the adjustments            
             if self.prev_params is not None:
@@ -110,16 +167,23 @@ class SamSegmenter:
         if self.image is None:
             raise ValueError("Image not loaded. Call load_image() before generate_masks().")
         
-        # Generate masks
+        # Generate masks and apply filtering
         self.masks = self.mask_generator.generate(self.image)
-        print(f"Number of masks: {len(self.masks)}")                    
+        self.segment_filtering()
+        print(f"Number of masks: {len(self.masks)}")
         
         # Adjust the mask generator parameters to reduce the number of masks if necessary
-        if (len(self.masks) > self.MAX_MASKS):
+        if (self.reduce_masks and len(self.masks) > self.MAX_MASKS):
             print(f"More than {self.MAX_MASKS} masks generated. Reducing masks...")
-            while True:
+
+            start_time = time.time()
+            while time.time() - start_time < self.timeout:
+                # Adjust the mask generator parameters
                 self.adjust_mask_generator_params()
-                self.masks = self.mask_generator.generate(self.image)                          
+
+                # Generate masks and apply filtering
+                self.masks = self.mask_generator.generate(self.image)
+                self.segment_filtering()
                 
                 # If the number of masks is reduced to the MAX_MASKS or less, break the loop
                 if (len(self.masks) <= self.MAX_MASKS):
@@ -127,6 +191,7 @@ class SamSegmenter:
                     if not self.masks:
                         self.adjust_mask_generator_params(backtrack=True)
                         self.masks = self.mask_generator.generate(self.image)
+                        self.segment_filtering()
                         print(f"Number of masks: {len(self.masks)}. Tried to reduce the number of masks to {self.MAX_MASKS} or less, but no masks were generated.\n")
                     
                     else:
@@ -136,6 +201,8 @@ class SamSegmenter:
 
                 else:
                     print(f"Number of masks reduced to {len(self.masks)}. Reducing to {self.MAX_MASKS} (or less) masks...")
+            else:
+                print(f"Number of masks ({len(self.masks)}) could not be reduced to {self.MAX_MASKS} or less within the timeout period.\n")
 
     def save_segmentation_results(self) -> None:
         """
@@ -198,6 +265,7 @@ def main():
         pred_iou_thresh=0.8,
         stability_score_thresh=0.8,
         box_nms_thresh=0.3,
+        # reduce_masks=False,
         MAX_MASKS=10
     )
 
