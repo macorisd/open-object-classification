@@ -33,6 +33,6 @@ def clear_output_classifications(directory: str) -> None:
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # clear_output_segments(script_dir)
-    # clear_output_descriptions(script_dir)
-    # clear_output_classifications(script_dir)
+    clear_output_segments(script_dir)
+    clear_output_descriptions(script_dir)
+    clear_output_classifications(script_dir)
