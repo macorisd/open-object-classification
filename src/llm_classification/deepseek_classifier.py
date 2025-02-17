@@ -11,17 +11,18 @@ class DeepseekClassifier:
     """
 
     def __init__(
-        self, 
-        script_dir: str,  # Path to the script directory
+        self,        
         deepseek_model_name: str = "deepseek-r1:14b",
+        pipeline_descriptions: str = None,  # The pipeline descriptions to be classified
         save_file: bool = True,  # Whether to save the classification results to a file
         timeout: int = 120  # Timeout in seconds
     ):
         """
         Initializes the paths, sets the timeout, and creates the classification directory.
         """
-        self.script_dir = script_dir
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.deepseek_model_name = deepseek_model_name
+        self.pipeline_descriptions = pipeline_descriptions
         self.save_file = save_file
         self.timeout = timeout
 
@@ -30,17 +31,39 @@ class DeepseekClassifier:
         with open(prompt_path, "r", encoding="utf-8") as f:
             self.prompt = f.read()
 
-        # Directory containing the .txt descriptions (output from the LVLM descriptor)
-        self.descriptions_dir = os.path.join(
-            self.script_dir,
-            "..",
-            "lvlm-description",
-            "output_descriptions"
-        )
+        if not pipeline_descriptions:
+            # Directory containing the .txt descriptions (output from the LVLM descriptor)
+            self.descriptions_dir = os.path.join(
+                self.script_dir,
+                "..",
+                "lvlm-description",
+                "output_descriptions"
+            )
 
         # Directory to store the classification results
         self.classification_dir = os.path.join(self.script_dir, "output_classification")
         os.makedirs(self.classification_dir, exist_ok=True)
+
+    def read_descriptions_from_file(self, file_path: str) -> str:
+        """
+        Reads the descriptions from the given file path.
+        """
+        # Gather all .txt files in descriptions_dir
+        txt_files = [
+            os.path.join(self.descriptions_dir, f)
+            for f in os.listdir(self.descriptions_dir)
+            if f.endswith(".txt")
+        ]
+        if not txt_files:
+            raise FileNotFoundError(f"No .txt files found in {self.descriptions_dir}")
+
+        # Select and read the most recently modified .txt file
+        latest_txt_path = max(txt_files, key=os.path.getmtime)
+        
+        with open(latest_txt_path, "r", encoding="utf-8") as f:
+            descriptions_content = f.read()
+
+        return descriptions_content
 
     def correct_answer_format(self, text: str) -> str:
         """
@@ -101,20 +124,7 @@ class DeepseekClassifier:
             FileNotFoundError: If no .txt files are found.
             TimeoutError: If a correct answer is not received within the timeout period.
         """
-        # Gather all .txt files in descriptions_dir
-        txt_files = [
-            os.path.join(self.descriptions_dir, f)
-            for f in os.listdir(self.descriptions_dir)
-            if f.endswith(".txt")
-        ]
-        if not txt_files:
-            raise FileNotFoundError(f"No .txt files found in {self.descriptions_dir}")
-
-        # Select and read the most recently modified .txt file
-        latest_txt_path = max(txt_files, key=os.path.getmtime)
-        
-        with open(latest_txt_path, "r", encoding="utf-8") as f:
-            descriptions_content = f.read()
+        descriptions_content = self.pipeline_descriptions if self.pipeline_descriptions else self.read_descriptions_from_file(self.descriptions_dir)
 
         start_time = time.time()
         correct_substring = None
@@ -154,9 +164,8 @@ class DeepseekClassifier:
 
         return correct_substring
 
-def main():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    classifier = DeepseekClassifier(script_dir, save_file=False)
+def main():    
+    classifier = DeepseekClassifier(save_file=False)
     final_answer = classifier.classify()
     print("\nFinal correct answer substring:\n", final_answer)
 

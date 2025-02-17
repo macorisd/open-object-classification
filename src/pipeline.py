@@ -1,5 +1,6 @@
 from segmentation.sam2_segmenter import SamSegmenter
 from lvlm_description.llava_descriptor import LlavaDescriptor
+from llm_classification.deepseek_classifier import DeepseekClassifier
 
 def segment_sam2() -> list:
     print("\nSEGMENTATION WITH SAM2 -------------------------------------\n")
@@ -12,18 +13,13 @@ def segment_sam2() -> list:
     # Workflow
     segmenter.load_image()
     segmenter.generate_masks()
-    segments = segmenter.save_segmentation_results()
+    segmenter.save_segmentation_results()
 
-    # Return the generated segments
-    return segments
-
-def describe_llava(segments: list) -> str:
+def describe_llava() -> str:
     print("\nSEGMENT DESCRIPTION WITH LLaVA -------------------------------------\n")
 
     # Create the descriptor instance
-    descriptor = LlavaDescriptor(
-        segment_images=segments
-    )
+    descriptor = LlavaDescriptor()
 
     # Workflow
     descriptor.load_segments()
@@ -33,15 +29,23 @@ def describe_llava(segments: list) -> str:
     return descriptions
 
 def classify_deepseek(descriptions: str) -> str:
-    pass
+    print("\nCLASSIFICATION WITH DEEPSEEK -------------------------------------\n")
+
+    # Create the classifier instance
+    classifier = DeepseekClassifier(        
+        pipeline_descriptions=descriptions
+    )
+
+    # Workflow
+    classification_results = classifier.classify()
+
+    # Return the classification results
+    return classification_results
 
 def main():
-    segments = segment_sam2()
-    descriptions = describe_llava(segments)
-    print(descriptions)
-    # classification = classify_deepseek(descriptions)
-
-    # print(classification)
+    segment_sam2()
+    descriptions = describe_llava()    
+    classify_deepseek(descriptions)
 
 if __name__ == "__main__":
     main()
