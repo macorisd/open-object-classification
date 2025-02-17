@@ -13,6 +13,8 @@ venv/
 *.out
 *.png
 *.txt
+scenenn_seg
+datasets
 
 # Model Checkpoints
 *.pth

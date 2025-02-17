@@ -213,7 +213,7 @@ class SamSegmenter:
         """
         if not self.masks:
             print("No masks were generated. Call generate_masks() before save_segmentation_results(), and if you've already done so, check the mask generator parameters.")
-            return []
+            return None
 
         # Clean the output directory if it exists
         if os.path.exists(self.output_dir):

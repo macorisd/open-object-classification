@@ -94,10 +94,10 @@ class DeepseekClassifier:
         try:
             parsed_data = json.loads(substring)
         except json.JSONDecodeError:
-            return None                
+            return None
 
         # The parsed data must be a dictionary with at least one item
-        if not isinstance(parsed_data, dict) or len(parsed_data) == 0:
+        if not isinstance(parsed_data, dict):
             return None                
 
         # Check each key-value pair in the dictionary

@@ -14,9 +14,9 @@ def clear_output_descriptions(directory: str) -> None:
     """
     Deletes all .txt files in the 'lvlm-description/output_descriptions' directory.
     """
-    for filename in os.listdir(os.path.join(directory, "lvlm-description", "output_descriptions")):
+    for filename in os.listdir(os.path.join(directory, "lvlm_description", "output_descriptions")):
         if filename.endswith(".txt"):
-            file_path = os.path.join(directory, "lvlm-description", "output_descriptions", filename)
+            file_path = os.path.join(directory, "lvlm_description", "output_descriptions", filename)
             os.remove(file_path)
             print(f"Deleted {file_path}")
 
@@ -24,9 +24,9 @@ def clear_output_classifications(directory: str) -> None:
     """
     Deletes all .txt files in the 'llm-classification/output_classification' directory.
     """
-    for filename in os.listdir(os.path.join(directory, "llm-classification", "output_classification")):
+    for filename in os.listdir(os.path.join(directory, "llm_classification", "output_classification")):
         if filename.endswith(".txt"):
-            file_path = os.path.join(directory, "llm-classification", "output_classification", filename)
+            file_path = os.path.join(directory, "llm_classification", "output_classification", filename)
             os.remove(file_path)
             print(f"Deleted {file_path}")
 
