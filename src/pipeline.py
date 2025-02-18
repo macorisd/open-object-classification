@@ -1,4 +1,4 @@
-from segmentation.sam2_segmenter import SamSegmenter
+from segmentation.sam_segmenter import SamSegmenter
 from lvlm_description.llava_descriptor import LlavaDescriptor
 from llm_classification.deepseek_classifier import DeepseekClassifier
 
@@ -6,8 +6,8 @@ def segment_sam2() -> bool:
     print("\n[PIPELINE] SEGMENTATION WITH SAM2 -------------------------------------\n")
     
     # Create the segmenter instance
-    segmenter = SamSegmenter(        
-        input_image_name="input_image5.jpg",
+    segmenter = SamSegmenter(
+        input_image_name="2.jpg",
         pred_iou_thresh=0.8,
         stability_score_thresh=0.8,
         box_nms_thresh=0.5

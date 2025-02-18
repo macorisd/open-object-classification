@@ -36,7 +36,7 @@ class DeepseekClassifier:
             self.descriptions_dir = os.path.join(
                 self.script_dir,
                 "..",
-                "lvlm-description",
+                "lvlm_description",
                 "output_descriptions"
             )
 
