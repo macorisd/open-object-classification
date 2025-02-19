@@ -13,8 +13,9 @@ class Sam2Segmenter:
     A class to handle image loading, segmentation with SAM2, and saving mask results.
     """
 
-    CROP_NO_BACKGROUND: int = 1
-    CROP_BBOX: int = 2
+    CROP_NO_BACKGROUND: int = 1         # Crop the mask without the background
+    CROP_BBOX: int = 2                  # Crop the entire bounding box
+    CROP_HIGHLIGHTED_MASK: int = 3      # Highlight the mask in the original image
 
     def select_device(self) -> None:
         if torch.cuda.is_available():
@@ -241,11 +242,15 @@ class Sam2Segmenter:
 
             # Crop the segment based on the bounding box
             x, y, w, h = [int(coord) for coord in mask_data["bbox"]]
-
-            if self.segment_crop_type == self.CROP_NO_BACKGROUND:
+            
+            if self.segment_crop_type == self.CROP_NO_BACKGROUND: # Crop the mask without the background
                 cropped_segment = segment[y:y+h, x:x+w]
-            elif self.segment_crop_type == self.CROP_BBOX:
-                cropped_segment = self.image[y:y+h, x:x+w]
+            elif self.segment_crop_type == self.CROP_BBOX: # Crop the entire bounding box
+                cropped_segment = self.image_bgr[y:y+h, x:x+w]
+            elif self.segment_crop_type == self.CROP_HIGHLIGHTED_MASK: # Highlight the mask in the original image
+                highlighted_image = image_bgr.copy()
+                cv2.rectangle(highlighted_image, (x, y), (x+w, y+h), (0, 0, 255), thickness=2)
+                cropped_segment = highlighted_image
 
             # Append the cropped segment to the list
             segments_list.append(cropped_segment)
@@ -263,12 +268,12 @@ def main():
     # Create the segmenter instance
     segmenter = Sam2Segmenter(        
         input_image_name="2.jpg",
-        pred_iou_thresh=0.7,
-        stability_score_thresh=0.7,
-        box_nms_thresh=0.3,
+        pred_iou_thresh=0.6,
+        stability_score_thresh=0.6,
+        box_nms_thresh=0.6,
         # reduce_masks=False,
-        MAX_MASKS=10,
-        segment_crop_type=Sam2Segmenter.CROP_NO_BACKGROUND
+        MAX_MASKS=20,
+        segment_crop_type=Sam2Segmenter.CROP_HIGHLIGHTED_MASK
     )
 
     # Workflow
