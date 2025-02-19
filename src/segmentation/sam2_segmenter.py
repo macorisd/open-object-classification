@@ -15,7 +15,9 @@ class Sam2Segmenter:
 
     CROP_NO_BACKGROUND: int = 1         # Crop the mask without the background
     CROP_BBOX: int = 2                  # Crop the entire bounding box
-    CROP_HIGHLIGHTED_MASK: int = 3      # Highlight the mask in the original image
+    CROP_BBOX_PADDING: int = 3          # Crop the entire bounding box with padding
+    HIGHLIGHTED_MASK: int = 4           # Highlight the mask in the original image
+    HIGHLIGHTED_BBOX: int = 5           # Highlight the mask's bounding box in the original image
 
     def select_device(self) -> None:
         if torch.cuda.is_available():
@@ -195,6 +197,43 @@ class Sam2Segmenter:
             else:
                 print(f"Number of masks ({len(self.masks)}) could not be reduced to {self.MAX_MASKS} or less within the timeout period.\n")
 
+    def crop_segment(self, image_bgr: np.ndarray, segment: np.ndarray, mask_data_bbox: list, segmentation: np.ndarray) -> np.ndarray:
+        """
+        Crops the segment based on the bounding box.
+
+        Args:
+            image_bgr (np.ndarray): The original image in BGR format.
+            segment (np.ndarray): The segment image to crop.
+            mask_data_bbox (list): The bounding box coordinates of the mask.
+            segmentation (np.ndarray): The mask segmentation.
+
+        Returns:
+            np.ndarray: The cropped segment image.
+        """
+        x, y, w, h = [int(coord) for coord in mask_data_bbox]
+        
+        if self.segment_crop_type == self.CROP_NO_BACKGROUND: # Crop the mask without the background
+            cropped_segment = segment[y:y+h, x:x+w]
+        elif self.segment_crop_type == self.CROP_BBOX: # Crop the entire bounding box
+            cropped_segment = self.image_bgr[y:y+h, x:x+w]
+        elif self.segment_crop_type == self.CROP_BBOX_PADDING: # Crop the entire bounding box with padding
+            padding = 25
+            x1, y1 = max(0, x-padding), max(0, y-padding)
+            x2, y2 = min(image_bgr.shape[1], x+w+padding), min(image_bgr.shape[0], y+h+padding)
+            cropped_segment = image_bgr[y1:y2, x1:x2]
+        elif self.segment_crop_type == self.HIGHLIGHTED_MASK: # Highlight the mask in the original image
+            highlighted_image = image_bgr.copy()
+            mask_255 = segmentation * 255
+            contours, _ = cv2.findContours(mask_255, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(highlighted_image, contours, -1, (0, 0, 255), thickness=2)
+            cropped_segment = highlighted_image
+        elif self.segment_crop_type == self.HIGHLIGHTED_BBOX: # Highlight the mask's bounding box in the original image
+            highlighted_image = image_bgr.copy()
+            cv2.rectangle(highlighted_image, (x, y), (x+w, y+h), (0, 0, 255), thickness=2)
+            cropped_segment = highlighted_image
+
+        return cropped_segment
+
     def save_segmentation_results(self) -> list:
         """
         Saves the segmented images based on the generated masks to disk and returns a list of the cropped segments.
@@ -241,16 +280,9 @@ class Sam2Segmenter:
             segment = cv2.bitwise_and(image_bgr, image_bgr, mask=segmentation * 255)
 
             # Crop the segment based on the bounding box
-            x, y, w, h = [int(coord) for coord in mask_data["bbox"]]
-            
-            if self.segment_crop_type == self.CROP_NO_BACKGROUND: # Crop the mask without the background
-                cropped_segment = segment[y:y+h, x:x+w]
-            elif self.segment_crop_type == self.CROP_BBOX: # Crop the entire bounding box
-                cropped_segment = self.image_bgr[y:y+h, x:x+w]
-            elif self.segment_crop_type == self.CROP_HIGHLIGHTED_MASK: # Highlight the mask in the original image
-                highlighted_image = image_bgr.copy()
-                cv2.rectangle(highlighted_image, (x, y), (x+w, y+h), (0, 0, 255), thickness=2)
-                cropped_segment = highlighted_image
+            x, y, w, h = [int(coord) for coord in mask_data["bbox"]]                        
+
+            cropped_segment = self.crop_segment(image_bgr, segment, mask_data["bbox"], segmentation)
 
             # Append the cropped segment to the list
             segments_list.append(cropped_segment)
@@ -273,7 +305,7 @@ def main():
         box_nms_thresh=0.6,
         # reduce_masks=False,
         MAX_MASKS=20,
-        segment_crop_type=Sam2Segmenter.CROP_HIGHLIGHTED_MASK
+        segment_crop_type=Sam2Segmenter.CROP_BBOX_PADDING
     )
 
     # Workflow
